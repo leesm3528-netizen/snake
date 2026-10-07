@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>웹캠 뱀게임</title>
+<style>
+  :root {
+    --bg: #10141c; --panel: #1a2030; --text: #e8ecf4; --muted: #8a93a8;
+    --accent: #4ade80; --food: #f87171; --grid: #161b27; --bar: #2a3247;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: system-ui, "Malgun Gothic", sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 16px;
+  }
+  h1 { margin: 8px 0 16px; font-size: 1.6rem; }
+  .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .panel { background: var(--panel); border-radius: 12px; padding: 16px; }
+  #game { display: block; background: var(--grid); border-radius: 8px; max-width: 100%; }
+  .hud { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1rem; }
+  .side { width: 300px; max-width: 100%; }
+  #webcam-container canvas { width: 100%; border-radius: 8px; display: block; background: #000; }
+  .controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button, select {
+    background: var(--accent); color: #0b1a10; border: 0; border-radius: 8px;
+    padding: 10px 14px; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  select { background: var(--bar); color: var(--text); }
+  .labels { margin-top: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: .9rem; }
+  .row .name { width: 64px; }
+  .row .bar { flex: 1; height: 14px; background: var(--bar); border-radius: 7px; overflow: hidden; }
+  .row .fill { height: 100%; width: 0; background: var(--muted); transition: width .1s; }
+  .row.active .fill { background: var(--accent); }
+  .row .pct { width: 40px; text-align: right; color: var(--muted); }
+  #current { font-size: 1.4rem; font-weight: 800; text-align: center; margin-top: 8px; }
+  #status { color: var(--muted); font-size: .85rem; margin-top: 8px; min-height: 1.2em; }
+  .help { color: var(--muted); font-size: .8rem; margin-top: 10px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>🐍 포즈로 조종하는 뱀게임</h1>
+<div class="wrap">
+  <div class="panel">
+    <div class="hud">
+      <span>점수: <b id="score">0</b></span>
+      <span>최고: <b id="best">0</b></span>
+    </div>
+    <canvas id="game" width="480" height="480"></canvas>
+    <div class="controls">
+      <button id="startBtn">웹캠 켜고 시작</button>
+      <button id="restartBtn" disabled>다시 시작</button>
+      <select id="speed">
+        <option value="260">느림</option>
+        <option value="180" selected>보통</option>
+        <option value="120">빠름</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel side">
+    <div id="webcam-container"></div>
+    <div id="current">-</div>
+    <div class="labels" id="labels"></div>
+    <div id="status">시작 버튼을 눌러 모델과 웹캠을 불러오세요.</div>
+    <div class="help">
+      동작: left / right / up / down 으로 방향 전환,<br>
+      neutral 이면 현재 방향 유지.<br>
+      키보드 방향키로도 조작할 수 있습니다.
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script>
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/U93WCxIU8/";
+const THRESHOLD = 0.8;   // 이 확률 이상일 때만 방향 전환
+const STABLE_FRAMES = 2; // 같은 포즈가 연속으로 이 프레임 수만큼 나와야 인정
+
+// ---------- 이미지 인식 ----------
+let model, webcam, labels = [];
+let lastLabel = null, stableCount = 0;
+
+async function initModel() {
+  const status = document.getElementById("status");
+  status.textContent = "모델 불러오는 중...";
+  model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+  labels = model.getClassLabels();
+
+  status.textContent = "웹캠 준비 중...";
+  const size = 300;
+  webcam = new tmImage.Webcam(size, size, true);
+  await webcam.setup();
+  await webcam.play();
+
+  const container = document.getElementById("webcam-container");
+  container.appendChild(webcam.canvas);
+
+  const labelsEl = document.getElementById("labels");
+  labels.forEach(l => {
+    const row = document.createElement("div");
+    row.className = "row"; row.id = "row-" + l;
+    row.innerHTML = `<span class="name">${l}</span><div class="bar"><div class="fill"></div></div><span class="pct">0%</span>`;
+    labelsEl.appendChild(row);
+  });
+
+  status.textContent = "준비 완료!";
+  window.requestAnimationFrame(predictLoop);
+}
+
+async function predictLoop() {
+  webcam.update();
+  const prediction = await model.predict(webcam.canvas);
+
+  let top = prediction[0];
+  prediction.forEach(p => {
+    if (p.probability > top.probability) top = p;
+    const row = document.getElementById("row-" + p.className);
+    row.querySelector(".fill").style.width = (p.probability * 100).toFixed(0) + "%";
+    row.querySelector(".pct").textContent = (p.probability * 100).toFixed(0) + "%";
+    row.classList.remove("active");
+  });
+  document.getElementById("row-" + top.className).classList.add("active");
+
+  if (top.probability >= THRESHOLD) {
+    const label = top.className.toLowerCase();
+    stableCount = label === lastLabel ? stableCount + 1 : 1;
+    lastLabel = label;
+    if (stableCount >= STABLE_FRAMES) handleCommand(label);
+  }
+  document.getElementById("current").textContent = top.className;
+
+  window.requestAnimationFrame(predictLoop);
+}
+
+// ---------- 뱀게임 ----------
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const CELLS = 20;
+const CELL = canvas.width / CELLS;
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+let snake, dir, nextDir, food, score, timer, running = false;
+let best = 0;
+try { best = Number(localStorage.getItem("snake-best")) || 0; } catch (e) {}
+document.getElementById("best").textContent = best;
+
+function handleCommand(label) {
+  if (!DIRS[label]) return; // neutral 등은 무시 → 현재 방향 유지
+  const [dx, dy] = DIRS[label];
+  const [cx, cy] = DIRS[dir];
+  if (dx === -cx && dy === -cy) return; // 정반대 방향 금지
+  nextDir = label;
+}
+
+function placeFood() {
+  do {
+    food = { x: Math.floor(Math.random() * CELLS), y: Math.floor(Math.random() * CELLS) };
+  } while (snake.some(s => s.x === food.x && s.y === food.y));
+}
+
+function resetGame() {
+  snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+  dir = nextDir = "right";
+  score = 0;
+  document.getElementById("score").textContent = score;
+  placeFood();
+  running = true;
+  clearInterval(timer);
+  timer = setInterval(tick, Number(document.getElementById("speed").value));
+  draw();
+}
+
+function tick() {
+  dir = nextDir;
+  const [dx, dy] = DIRS[dir];
+  const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+  const hitWall = head.x < 0 || head.y < 0 || head.x >= CELLS || head.y >= CELLS;
+  const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
+  if (hitWall || hitSelf) return gameOver();
+
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    score++;
+    document.getElementById("score").textContent = score;
+    placeFood();
+  } else {
+    snake.pop();
+  }
+  draw();
+}
+
+function gameOver() {
+  running = false;
+  clearInterval(timer);
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem("snake-best", best); } catch (e) {}
+    document.getElementById("best").textContent = best;
+  }
+  draw();
+  ctx.fillStyle = "rgba(0,0,0,.6)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.font = "bold 36px system-ui";
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 10);
+  ctx.font = "18px system-ui";
+  ctx.fillText(`점수 ${score} · '다시 시작'을 누르세요`, canvas.width / 2, canvas.height / 2 + 24);
+}
+
+function draw() {
+  ctx.fillStyle = "#161b27";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#f87171";
+  ctx.beginPath();
+  ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  snake.forEach((s, i) => {
+    ctx.fillStyle = i === 0 ? "#86efac" : "#4ade80";
+    ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2);
+  });
+}
+
+// ---------- 버튼 / 키보드 ----------
+document.getElementById("startBtn").addEventListener("click", async e => {
+  e.target.disabled = true;
+  try {
+    await initModel();
+    document.getElementById("restartBtn").disabled = false;
+    resetGame();
+  } catch (err) {
+    console.error(err);
+    document.getElementById("status").textContent = "오류: " + err.message + " (웹캠 권한/로컬 서버 실행 여부를 확인하세요)";
+    e.target.disabled = false;
+  }
+});
+document.getElementById("restartBtn").addEventListener("click", resetGame);
+document.getElementById("speed").addEventListener("change", () => { if (running) resetGame(); });
+
+document.addEventListener("keydown", e => {
+  const map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+  if (map[e.key] && running) { e.preventDefault(); handleCommand(map[e.key]); }
+});
+
+// 초기 화면
+snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+food = { x: 15, y: 10 };
+draw();
+</script>
+</body>
+</html>
