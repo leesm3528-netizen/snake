@@ -7,7 +7,7 @@
 
 ---
 
-## 📋 목차
+## 목차
 
 1. [학습 목표](#1-학습-목표)
 2. [준비물: Teachable Machine 모델](#2-준비물-teachable-machine-모델)
@@ -57,13 +57,13 @@ curl -sL https://teachablemachine.withgoogle.com/models/U93WCxIU8/metadata.json
 | `labels` | left, right, up, down, neutral | 게임 방향 4개 + 가만히 있기 |
 | `imageSize` | 224 | 모델 입력 이미지 크기 (224×224) |
 
-> 📌 **핵심 포인트**: `-L` 옵션이 없으면 `Found. Redirecting to ...`만 나옵니다. 모델 파일은 실제로 `storage.googleapis.com`에 있어서 리다이렉트를 따라가야 합니다.
+> **핵심 포인트**: `-L` 옵션이 없으면 `Found. Redirecting to ...`만 나옵니다. 모델 파일은 실제로 `storage.googleapis.com`에 있어서 리다이렉트를 따라가야 합니다.
 
 ---
 
 ## 3. 실습 1: 포즈 모델을 이미지 모델로 바꾸기
 
-📄 파일: [`index.html`](index.html)
+파일: [`index.html`](index.html)
 
 처음 코드는 **포즈 모델**(`@teachablemachine/pose`)용이었습니다. 새 모델은 **이미지 모델**이라 라이브러리와 추론 방식을 바꿔야 합니다.
 
@@ -113,7 +113,7 @@ const prediction = await model.predict(webcam.canvas);
 
 `prediction`은 클래스마다 `{ className, probability }`가 들어 있는 배열입니다.
 
-> 📌 **핵심 포인트**: 모델이 바뀌어도 `predict()`가 돌려주는 결과 형식은 같습니다. 그래서 **게임 쪽 코드는 하나도 바꾸지 않았습니다.** 인식 부분과 게임 부분을 나눠 두면 이렇게 교체가 쉽습니다.
+> **핵심 포인트**: 모델이 바뀌어도 `predict()`가 돌려주는 결과 형식은 같습니다. 그래서 **게임 쪽 코드는 하나도 바꾸지 않았습니다.** 인식 부분과 게임 부분을 나눠 두면 이렇게 교체가 쉽습니다.
 
 ---
 
@@ -157,7 +157,7 @@ function handleCommand(label) {
 - `neutral`은 `DIRS`에 없으므로 무시됩니다. 뱀은 하던 방향으로 계속 갑니다.
 - 오른쪽으로 가는 중에 `left`가 나오면 자기 몸에 바로 부딪히므로 무시합니다.
 
-> 📌 **핵심 포인트**: `neutral` 클래스가 있어서 "아무 동작도 안 함"을 따로 인식할 수 있습니다. 이 클래스가 없으면 가만히 있어도 네 방향 중 하나로 분류됩니다.
+> **핵심 포인트**: `neutral` 클래스가 있어서 "아무 동작도 안 함"을 따로 인식할 수 있습니다. 이 클래스가 없으면 가만히 있어도 네 방향 중 하나로 분류됩니다.
 
 ---
 
@@ -185,7 +185,7 @@ function handleCommand(label) {
                                        아니오 ──▶ 꼬리 제거 (pop)
 ```
 
-> 📌 **핵심 포인트**: 뱀이 "움직이는" 것은 앞에 머리를 하나 붙이고 뒤에서 꼬리를 하나 떼는 것입니다. 먹이를 먹었을 때 꼬리를 안 떼면 길어집니다.
+> **핵심 포인트**: 뱀이 "움직이는" 것은 앞에 머리를 하나 붙이고 뒤에서 꼬리를 하나 떼는 것입니다. 먹이를 먹었을 때 꼬리를 안 떼면 길어집니다.
 
 ---
 
@@ -211,13 +211,13 @@ gh api repos/leesm3528-netizen/snake/pages/builds/latest --jq ".status"   # buil
 - 이후 `main`에 푸시하면 자동으로 다시 배포됩니다.
 - 처음 켠 직후에는 1분 정도 404가 나올 수 있습니다. 빌드 상태가 `built`가 되면 접속됩니다.
 
-> 📌 **핵심 포인트**: 브라우저는 **https 또는 localhost**에서만 웹캠을 허용합니다. GitHub Pages는 https로 서비스되므로 따로 서버를 켜지 않아도 웹캠이 동작합니다.
+> **핵심 포인트**: 브라우저는 **https 또는 localhost**에서만 웹캠을 허용합니다. GitHub Pages는 https로 서비스되므로 따로 서버를 켜지 않아도 웹캠이 동작합니다.
 
 ---
 
 ## 7. 트러블슈팅
 
-### 🐛 `gh: command not found`
+### `gh: command not found`
 
 | 항목 | 내용 |
 |---|---|
@@ -226,7 +226,7 @@ gh api repos/leesm3528-netizen/snake/pages/builds/latest --jq ".status"   # buil
 | **확인** | `Test-Path "C:\Program Files\GitHub CLI\gh.exe"` → `True` |
 | **해결** | 터미널을 새로 열거나, 전체 경로로 실행: `& "C:\Program Files\GitHub CLI\gh.exe" auth status` |
 
-### 🐛 코드 자동 치환이 실패함
+### 코드 자동 치환이 실패함
 
 | 항목 | 내용 |
 |---|---|
@@ -235,7 +235,7 @@ gh api repos/leesm3528-netizen/snake/pages/builds/latest --jq ".status"   # buil
 | **원인 2** | `str.replace()`는 **일치하는 곳을 모두** 바꿈. `requestAnimationFrame(poseLoop)`가 두 군데 있어서 앞의 치환이 뒤의 검색 대상까지 바꿔 버림 |
 | **해결** | 한 곳만 정확히 지정해서 고치기 (편집기에서 직접 수정, 또는 `replace(a, b, 1)`) |
 
-### 🐛 웹캠이 안 켜짐
+### 웹캠이 안 켜짐
 
 | 원인 | 해결 |
 |---|---|
@@ -257,7 +257,7 @@ gh api repos/leesm3528-netizen/snake/pages/builds/latest --jq ".status"   # buil
 | neutral | 방향 목록에 없으면 무시 → 현재 방향 유지 |
 | 배포 | `gh repo create --push` + Pages API, https라서 웹캠 가능 |
 
-### 🧠 복습 퀴즈
+### 복습 퀴즈
 
 <details>
 <summary><b>Q1.</b> 받은 Teachable Machine 모델이 이미지 모델인지 포즈 모델인지 어떻게 알 수 있나요?</summary>
@@ -289,7 +289,7 @@ gh api repos/leesm3528-netizen/snake/pages/builds/latest --jq ".status"   # buil
 무시됩니다. 정반대 방향으로 꺾으면 바로 자기 몸에 부딪히므로 `handleCommand()`에서 막습니다.
 </details>
 
-### 🚀 도전 과제
+### 도전 과제
 
 - [ ] 화면에 슬라이더를 달아 `THRESHOLD`를 실시간으로 바꿔 보세요.
 - [ ] 먹이를 먹을 때마다 조금씩 빨라지게 만들어 보세요.
